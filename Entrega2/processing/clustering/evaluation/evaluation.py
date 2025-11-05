@@ -149,3 +149,73 @@ def sweep_kmeans_k(
             results.append({"k": int(k), "silhouette": np.nan, "calinski_harabasz": np.nan, "davies_bouldin": np.nan})
 
     return results
+
+
+# =============================
+# Evaluación por categorías y utilidades
+# =============================
+
+
+def evaluate_category_distribution(
+    abstracts: Sequence[str],
+    labels: Sequence[int],
+    categories: dict[str, list[str]],
+) -> dict[int, dict[str, float]]:
+    """Calcula la proporción de documentos de cada cluster que mencionan cada categoría.
+
+    Devuelve: {cluster_id: {category: ratio_0_1}}
+    """
+    import re
+
+    y = np.asarray(labels)
+    clusters = np.unique(y)
+
+    # compilar patrones por categoría (case-insensitive, límites de palabra)
+    pats: dict[str, list[re.Pattern]] = {
+        cat: [re.compile(rf"\\b{re.escape(t.lower())}\\b", flags=re.IGNORECASE) for t in terms]
+        for cat, terms in categories.items()
+    }
+
+    # normalizar textos
+    texts = [(a or "").lower() for a in abstracts]
+
+    out: dict[int, dict[str, float]] = {}
+    for c in clusters:
+        idxs = np.where(y == c)[0]
+        n = len(idxs)
+        cat_hits: dict[str, int] = {cat: 0 for cat in categories}
+        for i in idxs:
+            t = texts[i]
+            for cat, patterns in pats.items():
+                if any(p.search(t) for p in patterns):
+                    cat_hits[cat] += 1
+        out[int(c)] = {cat: (cat_hits[cat] / n if n else 0.0) for cat in categories}
+    return out
+
+
+def compute_category_coherence(distrib: dict[int, dict[str, float]]) -> float:
+    """Calcula una medida simple de coherencia: media de varianzas normalizadas por cluster."""
+    vals: list[float] = []
+    for _, cat_scores in distrib.items():
+        v = list(cat_scores.values())
+        if not v:
+            vals.append(0.0)
+            continue
+        var = float(np.var(v))
+        max_var = float(np.var([1.0] + [0.0] * (len(v) - 1))) if len(v) > 1 else 0.0
+        vals.append((var / max_var) if max_var > 0 else 0.0)
+    return float(np.mean(vals)) if vals else 0.0
+
+
+def save_cluster_assignments(labels: Sequence[int], ids: Sequence[str] | None, path: str) -> str:
+    """Guarda asignaciones de cluster junto con IDs (opcional)."""
+    import pandas as pd
+
+    y = np.asarray(labels).astype(int)
+    df = pd.DataFrame({"id": ids if ids is not None else np.arange(len(y)), "cluster": y})
+    from pathlib import Path
+
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(p, index=False)
+    return str(p)
