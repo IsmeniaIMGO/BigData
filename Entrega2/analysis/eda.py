@@ -147,7 +147,7 @@ def analyze_predefined_categories(
     categories = categories or get_predefined_categories()
     patterns: Dict[str, list[re.Pattern]] = {}
     for cat, terms in categories.items():
-        patterns[cat] = [re.compile(rf"\\b{re.escape(t.lower())}\\b", flags=re.IGNORECASE) for t in terms]
+        patterns[cat] = [re.compile(rf"\b{re.escape(t.lower())}\b", flags=re.IGNORECASE) for t in terms]
 
     total_hits: Dict[str, int] = {cat: 0 for cat in categories}
     docs_with_hits: Dict[str, int] = {cat: 0 for cat in categories}
@@ -192,7 +192,7 @@ def add_category_flags(
         df[text_col] = ""
 
     patterns: Dict[str, list[re.Pattern]] = {
-        cat: [re.compile(rf"\\b{re.escape(t.lower())}\\b", flags=re.IGNORECASE) for t in terms]
+        cat: [re.compile(rf"\b{re.escape(t.lower())}\b", flags=re.IGNORECASE) for t in terms]
         for cat, terms in categories.items()
     }
 

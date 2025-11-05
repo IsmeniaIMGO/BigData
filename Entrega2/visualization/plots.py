@@ -186,7 +186,8 @@ def plot_sorting_benchmarks(
         ax.set_title(f"Tiempo de ejecución - {categoria} (n={len(categorias.get(categoria, []))})")
         ax.set_xlabel("Algoritmo")
         ax.set_ylabel("Tiempo (ms)")
-        ax.set_xticklabels(nombres, rotation=45, ha="right")
+        # Rotar etiquetas sin forzar un locator fijo para evitar UserWarning de set_ticklabels
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
         for b, t in zip(bars, tiempos):
             ax.text(b.get_x() + b.get_width() / 2, b.get_height() + 0.1, f"{t:.2f}", ha="center", va="bottom")
         ax.grid(axis="y", alpha=0.3)
@@ -416,3 +417,49 @@ def plot_cooccurrence_network(edges: list[tuple[str, str, int]], out_name: str =
     fig.savefig(p, dpi=300)
     plt.close(fig)
     return str(p)
+
+
+def plot_wordcloud_top_words(
+    texts: Iterable[str] | pd.Series | pd.DataFrame,
+    text_col: str | None = None,
+    out_name: str = "wordcloud_top_words.png",
+    top_n: int = 200,
+    min_token_len: int = 2,
+    lowercase: bool = True,
+) -> str:
+    """Genera una nube de palabras a partir de los textos ya preprocesados (sin stopwords).
+
+    - texts puede ser:
+      - Iterable[str] / Series: colección de textos preprocesados
+      - DataFrame + text_col: se usará esa columna (e.g., 'abstract_clean')
+    - Se cuentan tokens separando por espacios; se filtran tokens cortos (min_token_len)
+    - Toma los top_n más frecuentes y delega en plot_wordcloud
+    """
+    from collections import Counter
+
+    # Extraer secuencia de strings de entrada
+    if isinstance(texts, pd.DataFrame):
+        if not text_col:
+            raise ValueError("Si 'texts' es un DataFrame, debes indicar 'text_col'.")
+        series = texts[text_col].fillna("").astype(str)
+    elif isinstance(texts, pd.Series):
+        series = texts.fillna("").astype(str)
+    else:
+        series = pd.Series(list(texts), dtype=str)
+
+    # Contar tokens (se asume preprocesamiento previo)
+    cnt: Counter[str] = Counter()
+    for t in series:
+        s = t.lower() if lowercase else str(t)
+        # separados por espacio; ignorar tokens muy cortos
+        tokens = [w for w in s.split() if len(w) >= min_token_len]
+        cnt.update(tokens)
+
+    if top_n and top_n > 0:
+        freqs = dict(cnt.most_common(top_n))
+    else:
+        freqs = dict(cnt)
+
+    return plot_wordcloud(freqs, out_name=out_name)
+
+

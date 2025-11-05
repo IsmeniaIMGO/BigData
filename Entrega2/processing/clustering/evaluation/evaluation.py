@@ -172,7 +172,7 @@ def evaluate_category_distribution(
 
     # compilar patrones por categoría (case-insensitive, límites de palabra)
     pats: dict[str, list[re.Pattern]] = {
-        cat: [re.compile(rf"\\b{re.escape(t.lower())}\\b", flags=re.IGNORECASE) for t in terms]
+        cat: [re.compile(rf"\b{re.escape(t.lower())}\b", flags=re.IGNORECASE) for t in terms]
         for cat, terms in categories.items()
     }
 

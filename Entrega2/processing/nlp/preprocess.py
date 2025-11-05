@@ -44,7 +44,7 @@ def clean_text(
 ) -> str:
     """Limpieza opcional de puntuación y dígitos.
 
-    Nota: re estándar no conoce \p{P}; usamos clases aproximadas.
+    Nota: re estándar no conoce \\p{P}; usamos clases aproximadas.
     """
     if not s:
         return ""

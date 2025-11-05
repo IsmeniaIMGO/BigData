@@ -38,6 +38,34 @@
 
 ![wordcloud](../visualization/bibliometrics/cli_wordcloud.png)
 
+### wordcloud_top_words
+
+![wordcloud_top_words](../visualization/bibliometrics/cli_wordcloud_top_words.png)
+
+### sorting_benchmark_1
+
+![sorting_benchmark_1](../visualization/sorting/sorting_benchmark_aleatorio.png)
+
+### sorting_benchmark_2
+
+![sorting_benchmark_2](../visualization/sorting/sorting_benchmark_ordenado.png)
+
+### sorting_benchmark_3
+
+![sorting_benchmark_3](../visualization/sorting/sorting_benchmark_invertido.png)
+
+### sorting_benchmark_4
+
+![sorting_benchmark_4](../visualization/sorting/sorting_benchmark_casi_ordenado.png)
+
+### sorting_benchmark_5
+
+![sorting_benchmark_5](../visualization/sorting/sorting_benchmark_duplicados.png)
+
+### sorting_benchmark_6
+
+![sorting_benchmark_6](../visualization/sorting/sorting_benchmark_global.png)
+
 ## Tablas generadas
 - predefined_categories_counts: C:\Users\Ismenia Guevara\Documents\Repositorios GIT\PracticasBigData\Entrega2\outputs\analysis\predefined_categories_counts.csv
 - predefined_categories_flags: C:\Users\Ismenia Guevara\Documents\Repositorios GIT\PracticasBigData\Entrega2\outputs\analysis\predefined_categories_flags.csv
@@ -51,3 +79,4 @@
 - freq_Intrusion Detection Systems (IDS): C:\Users\Ismenia Guevara\Documents\Repositorios GIT\PracticasBigData\Entrega2\outputs\analysis\freq_Intrusion_Detection_Systems_(IDS).csv
 - freq_Intrusion Prevention System (IPS): C:\Users\Ismenia Guevara\Documents\Repositorios GIT\PracticasBigData\Entrega2\outputs\analysis\freq_Intrusion_Prevention_System_(IPS).csv
 - freq_Algorithms: C:\Users\Ismenia Guevara\Documents\Repositorios GIT\PracticasBigData\Entrega2\outputs\analysis\freq_Algorithms.csv
+- sorting_benchmarks: C:\Users\Ismenia Guevara\Documents\Repositorios GIT\PracticasBigData\Entrega2\outputs\analysis\sorting_benchmarks.csv

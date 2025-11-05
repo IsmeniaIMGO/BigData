@@ -294,6 +294,14 @@ def integrated_visualizations(processed_csv: Optional[str] = None, labels_path: 
                 freqs = dict(total_counter.most_common(200))
                 p = plot_wordcloud(freqs, out_name="cli_wordcloud.png")
                 images["wordcloud"] = p
+            # wordcloud por tokens más frecuentes en abstract_clean (si existe)
+            try:
+                if "abstract_clean" in df.columns:
+                    from visualization.plots import plot_wordcloud_top_words
+                    p2 = plot_wordcloud_top_words(df, text_col="abstract_clean", top_n=200, out_name="cli_wordcloud_top_words.png")
+                    images["wordcloud_top_words"] = p2
+            except Exception:
+                pass
             # co-ocurrencias
             edges = build_cooccurrence_network(df, categories=cats, text_col="abstract")
             if edges:

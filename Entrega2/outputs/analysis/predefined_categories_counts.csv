@@ -1,10 +1,10 @@
 category,total_hits,docs_with_hits
-IOT,0,0
-Big Data (BDT),0,0
-Cybersecurity,0,0
-Blockchain,0,0
-AI,0,0
-Machine Learning (ML),0,0
-Intrusion Detection Systems (IDS),0,0
-Intrusion Prevention System (IPS),0,0
-Algorithms,0,0
+Cybersecurity,83,29
+IOT,64,15
+AI,39,11
+Intrusion Detection Systems (IDS),34,11
+Big Data (BDT),32,14
+Algorithms,24,11
+Machine Learning (ML),16,10
+Blockchain,7,3
+Intrusion Prevention System (IPS),3,1
