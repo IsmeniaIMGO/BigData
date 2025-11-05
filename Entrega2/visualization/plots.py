@@ -54,12 +54,23 @@ def plot_top_bars(counts: pd.Series, title: str, out_name: str = "top_bars.png",
     return str(p)
 
 
-def plot_cluster_sizes(labels: Sequence[int], out_name: str = "cluster_sizes.png") -> str:
+def plot_cluster_sizes(
+    labels: Sequence[int],
+    out_name: str = "cluster_sizes.png",
+    sort_by: str = "id",  # "id" | "count"
+) -> str:
     import matplotlib.pyplot as plt
 
     labels = np.asarray(labels)
     unique, counts = np.unique(labels, return_counts=True)
-    series = pd.Series(counts, index=[str(u) for u in unique]).sort_values(ascending=False)
+    # Serie con índice numérico de cluster para poder ordenar por id o por tamaño
+    series = pd.Series(counts, index=unique)
+    if str(sort_by).lower() == "count":
+        series = series.sort_values(ascending=False)
+    else:
+        series = series.sort_index()
+    # Mostrar etiquetas como string para mejor formato en eje X
+    series.index = [str(i) for i in series.index]
     fig, ax = plt.subplots(figsize=(8, 5))
     series.plot(kind="bar", ax=ax)
     ax.set_title("Tamaño de clusters")
@@ -426,6 +437,9 @@ def plot_wordcloud_top_words(
     top_n: int = 200,
     min_token_len: int = 2,
     lowercase: bool = True,
+    remove_stopwords: bool = True,
+    languages: Sequence[str] = ("english", "spanish"),
+    extra_stopwords: Optional[Iterable[str]] = None,
 ) -> str:
     """Genera una nube de palabras a partir de los textos ya preprocesados (sin stopwords).
 
@@ -447,12 +461,31 @@ def plot_wordcloud_top_words(
     else:
         series = pd.Series(list(texts), dtype=str)
 
+    # Preparar stopwords (intenta NLTK; fallback básico)
+    sw: set[str] = set()
+    if remove_stopwords:
+        try:
+            from nltk.corpus import stopwords  # type: ignore
+
+            for lang in languages:
+                try:
+                    sw.update(w.lower() for w in stopwords.words(lang))
+                except Exception:
+                    pass
+        except Exception:
+            # Fallback mínimo si NLTK no está disponible
+            sw.update({
+                "the","in","to","and","for","of","on","a","an","is","are","with","by","from","at","this","that",
+                "de","la","el","y","en","para","que","los","las","con","por","del","un","una"})
+    if extra_stopwords:
+        sw.update([str(w).lower() for w in extra_stopwords])
+
     # Contar tokens (se asume preprocesamiento previo)
     cnt: Counter[str] = Counter()
     for t in series:
         s = t.lower() if lowercase else str(t)
         # separados por espacio; ignorar tokens muy cortos
-        tokens = [w for w in s.split() if len(w) >= min_token_len]
+        tokens = [w for w in s.split() if len(w) >= min_token_len and (not remove_stopwords or w.lower() not in sw)]
         cnt.update(tokens)
 
     if top_n and top_n > 0:

@@ -185,7 +185,7 @@ def integrated_visualizations(processed_csv: Optional[str] = None, labels_path: 
                 for row in r:
                     if row:
                         labels.append(int(float(row[0])))
-            p = plot_cluster_sizes(labels, out_name="cli_cluster_sizes.png")
+            p = plot_cluster_sizes(labels, out_name="cli_cluster_sizes.png", sort_by="id")
             images["cluster_sizes"] = p
 
             # Distribución por categorías por cluster
@@ -298,7 +298,14 @@ def integrated_visualizations(processed_csv: Optional[str] = None, labels_path: 
             try:
                 if "abstract_clean" in df.columns:
                     from visualization.plots import plot_wordcloud_top_words
-                    p2 = plot_wordcloud_top_words(df, text_col="abstract_clean", top_n=200, out_name="cli_wordcloud_top_words.png")
+                    p2 = plot_wordcloud_top_words(
+                        df,
+                        text_col="abstract_clean",
+                        top_n=200,
+                        out_name="cli_wordcloud_top_words.png",
+                        remove_stopwords=True,
+                        languages=("english", "spanish"),
+                    )
                     images["wordcloud_top_words"] = p2
             except Exception:
                 pass
