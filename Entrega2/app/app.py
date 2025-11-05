@@ -413,6 +413,11 @@ def integrated_visualizations(processed_csv: Optional[str] = None, labels_path: 
 
 
 def generate_report(artifacts: dict, images: dict, tables: Optional[dict] = None, out_path: Optional[str] = None) -> str:
+    """Genera un reporte ordenado con artefactos, métricas, visualizaciones (con explicación) y tablas.
+
+    - Visualizaciones: se ordenan por una lista conocida y se añade una descripción breve del método.
+    - Tablas: se presentan como tabla Markdown con nombre, descripción y ruta relativa.
+    """
     from processing.utils.export import write_report_md
 
     paths = _resolve_paths()
@@ -420,41 +425,113 @@ def generate_report(artifacts: dict, images: dict, tables: Optional[dict] = None
     report_dir.mkdir(parents=True, exist_ok=True)
     out_md = Path(out_path) if out_path else (report_dir / "pipeline_report.md")
 
-    # Artefactos en formato lista
-    artifacts_lines = []
-    for k, v in artifacts.items():
-        if v:
-            artifacts_lines.append(f"- {k}: {v}")
-    artifacts_text = "\n".join(artifacts_lines) if artifacts_lines else "(sin artefactos)"
+    def rel_from_outputs(p: str) -> str:
+        try:
+            return Path(p).relative_to(paths["outputs"]).as_posix()
+        except Exception:
+            return Path(p).as_posix()
 
-    # Cargar métricas si existen
-    metrics_text = ""
+    # 1) Artefactos
+    art_k_order = ["unify_csv", "nlp_csv", "features", "index", "labels", "metrics"]
+    art_lines: list[str] = []
+    for k in art_k_order + [k for k in artifacts.keys() if k not in art_k_order]:
+        v = artifacts.get(k)
+        if not v:
+            continue
+        art_lines.append(f"- {k}: {v}")
+    artifacts_text = "\n".join(art_lines) if art_lines else "(sin artefactos)"
+
+    # 2) Métricas de clustering (como tabla)
+    metrics_md = "(no disponibles)"
     metrics_path = artifacts.get("metrics")
     if metrics_path and Path(metrics_path).exists():
         try:
             data = json.loads(Path(metrics_path).read_text(encoding="utf-8"))
-            metrics_text = "\n".join([f"- {k}: {v}" for k, v in data.items()])
+            rows = ["| Métrica | Valor |", "|---|---:|"]
+            for k, v in data.items():
+                rows.append(f"| {k} | {v} |")
+            metrics_md = "\n".join(rows)
         except Exception:
-            metrics_text = "(no se pudieron leer las métricas)"
-    else:
-        metrics_text = "(no disponibles)"
+            metrics_md = "(no se pudieron leer las métricas)"
 
-    # Sección de visualizaciones
-    viz_lines: list[str] = []
-    for name, path in images.items():
-        if path and Path(path).exists():
-            rel = Path(path).relative_to(paths["outputs"]).as_posix()
-            viz_lines.append(f"### {name}\n\n![{name}](../{rel})\n")
-    viz_text = "\n".join(viz_lines) if viz_lines else "(no generadas)"
+    # 3) Visualizaciones (con descripciones)
+    viz_descriptions = {
+        "publications_per_year": "Conteo de publicaciones por año (matplotlib sobre columna 'year').",
+        "top_authors": "Top autores tras expandir separadores comunes (barras horizontales).",
+        "cluster_sizes": "Distribución de tamaños de cluster (conteos por etiqueta).",
+        "category_distribution": "Heatmap de categorías por cluster (seaborn; matching por regex con límites de palabra).",
+        "silhouette": "Histograma de valores de silhouette (sklearn, métrica coseno con submuestreo).",
+        "similarity_heatmap": "Mapa de calor de similitud coseno entre documentos (seaborn).",
+        "embeddings_scatter": "Proyección UMAP 2D de features (umap-learn + matplotlib).",
+        "wordcloud": "Nube de palabras a partir de frecuencias por categorías predefinidas (wordcloud).",
+        "wordcloud_top_words": "Nube de palabras más frecuentes de 'abstract_clean' ya sin stopwords.",
+        "co_word_network": "Red de co-ocurrencia de términos (networkx).",
+    }
+    # Benchmarks de sorting: múltiples imágenes por categoría + global
+    # Cualquier clave que empiece por 'sorting_benchmark_' se explicará con descripción genérica
+    viz_order = [
+        "publications_per_year",
+        "top_authors",
+        "cluster_sizes",
+        "category_distribution",
+        "silhouette",
+        "similarity_heatmap",
+        "embeddings_scatter",
+        "wordcloud",
+        "wordcloud_top_words",
+        "co_word_network",
+    ]
 
+    viz_blocks: list[str] = []
+    # Primero las conocidas en orden
+    for k in viz_order:
+        p = images.get(k)
+        if not p or not Path(p).exists():
+            continue
+        rel = rel_from_outputs(p)
+        title = k.replace("_", " ").title()
+        desc = viz_descriptions.get(k, "")
+        viz_blocks.append(f"### {title}\n\n{desc}\n\n![{k}](../{rel})\n")
+    # Luego el resto (incluye sorting benchmarks y cualquier otra)
+    for k, p in sorted(images.items()):
+        if k in viz_order:
+            continue
+        if not p or not Path(p).exists():
+            continue
+        rel = rel_from_outputs(p)
+        title = k.replace("_", " ").title()
+        desc = "Benchmarks de algoritmos de ordenamiento (tiempos medios en ms)." if k.startswith("sorting_benchmark_") else ""
+        viz_blocks.append(f"### {title}\n\n{desc}\n\n![{k}](../{rel})\n")
+    viz_text = "\n".join(viz_blocks) if viz_blocks else "(no generadas)"
+
+    # 4) Tablas (como tabla Markdown)
+    table_desc = {
+        "pubs_per_year": "Conteo de publicaciones por año.",
+        "top_authors": "Autores más frecuentes.",
+        "top_1grams": "Unigramas más frecuentes (sobre texto limpio).",
+        "top_2grams": "Bigramas más frecuentes (sobre texto limpio).",
+        "predefined_categories_counts": "Frecuencias y nº documentos por categoría predefinida.",
+        "predefined_categories_flags": "Flags booleanas por categoría para cada documento.",
+        "category_distribution": "Distribución de categorías por cluster (tabla larga).",
+        "sorting_benchmarks": "Resultados de benchmarks de ordenamiento (tiempos).",
+    }
+    tables_md = "(no generadas)"
+    if tables:
+        rows = ["| Tabla | Descripción | Ruta |", "|---|---|---|"]
+        for k in sorted(tables.keys()):
+            p = tables[k]
+            rel = rel_from_outputs(p) if p else ""
+            desc = table_desc.get(k, "")
+            rows.append(f"| {k} | {desc} | ../{rel} |")
+        tables_md = "\n".join(rows)
+
+    # Armar secciones en orden lógico
     sections = {
         "Artefactos": artifacts_text,
-        "Métricas de clustering": metrics_text,
+        "Métricas de clustering": metrics_md,
         "Visualizaciones": viz_text,
+        "Tablas generadas": tables_md,
     }
-    if tables:
-        tbl_lines = [f"- {k}: {v}" for k, v in tables.items()]
-        sections["Tablas generadas"] = "\n".join(tbl_lines) if tbl_lines else "(no generadas)"
 
     write_report_md(sections, out_md, title="Reporte de Pipeline")
     return str(out_md)
