@@ -1,0 +1,8 @@
+tool,metric,time_s
+pyspark,load,3.559160
+pyspark,preprocess,3.648204
+pyspark,total_por_departamento,1.123784
+pyspark,heridos_muertos_por_departamento,0.705167
+pyspark,top_por_tipo_vehiculo,0.649685
+pyspark,tendencias_mensuales,0.842286
+pyspark,accidentes_por_hora_dia,0.619258

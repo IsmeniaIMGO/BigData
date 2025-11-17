@@ -1,25 +1,37 @@
 import matplotlib.pyplot as plt
 import pandas as pd
+from pathlib import Path
 
 # Cargar tabla de tiempos anteriormente exportada
-df = pd.read_csv("results/timing_comparison.csv")
+df = pd.read_csv("Entrega3/results/timing_comparison.csv")
+df["time_s"] = pd.to_numeric(df["time_s"], errors="coerce")
 
-# Crear gráfica
-plt.figure(figsize=(10,6))
-for tool in ['pandas', 'pyspark']:
-    subset = df[df['tool'] == tool]
-    plt.bar(subset['metric'], subset['time_s'], alpha=0.7, label=tool)
+# Preparar datos pivot para barras lado a lado
+pv = df.pivot(index="metric", columns="tool", values="time_s").sort_index()
+pv = pv.reindex(columns=["pandas", "pyspark"])  # asegurar orden de columnas
+
+# Asegurar carpeta de salida
+out_dir = Path("Entrega3/graficos")
+out_dir.mkdir(parents=True, exist_ok=True)
+
+# Configuración del gráfico de barras lado a lado con colores fijos
+metrics = list(pv.index)
+x = list(range(len(metrics)))
+width = 0.4
+
+plt.figure(figsize=(12, 6))
+plt.bar([i - width/2 for i in x], pv["pandas"], width=width, color="#1f77b4", label="pandas")
+plt.bar([i + width/2 for i in x], pv["pyspark"], width=width, color="#ff7f0e", label="pyspark")
 
 plt.xlabel("Métrica")
 plt.ylabel("Tiempo (segundos)")
 plt.title("Comparación de Rendimiento: Pandas vs PySpark")
+plt.xticks(ticks=x, labels=metrics, rotation=45, ha="right")
 plt.legend()
-plt.xticks(rotation=45)
 plt.tight_layout()
-plt.show()
-# Guardar gráfica
-plt.savefig("results/timing_comparison.png")
-# También exportar tabla resumen
-df_pivot = df.pivot(index='metric', columns='tool', values='time_s')
-df_pivot.to_csv("results/timing_comparison_summary.csv")
-print("Gráfica y tabla resumen guardadas en 'results/'")
+
+# Guardar gráfica y resumen
+plt.savefig(out_dir / "timing_comparison.png")
+pv.to_csv(out_dir / "timing_comparison_summary.csv")
+print("Gráfica y tabla resumen guardadas en 'Entrega3/graficos/'")
+plt.close()

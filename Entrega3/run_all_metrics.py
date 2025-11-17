@@ -19,7 +19,8 @@ def run_pyspark():
 
 
 def aggregate():
-    import Entrega3.agregarTiempos as agregarTiempos  # type: ignore
+    # Import local del agregador en el mismo directorio
+    import agregarTiempos as agregarTiempos  # type: ignore
     return agregarTiempos.main()
 
 

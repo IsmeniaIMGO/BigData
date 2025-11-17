@@ -37,6 +37,7 @@ def load():
 def _find_date_column(df: pd.DataFrame) -> str | None:
     candidates = [
         "FECHA", "fecha", "Fecha", "FECHA_HORA", "FECHA_OCURRENCIA", "FECHA_OCURRENCIA_HECHO",
+        "FECHA_ACCIDENTE",
         "DATE", "Date", "datetime", "DATETIME",
     ]
     for c in candidates:
@@ -53,7 +54,11 @@ def preprocess(df):
         df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
     # asegurar columna DEPARTAMENTO si existe, sino crear vacía para no romper flujos
     if "DEPARTAMENTO" not in df.columns:
-        df["DEPARTAMENTO"] = pd.NA
+        # mapear desde nombre real si existe
+        if "DEPARTAMENTO_ACCIDENTE" in df.columns:
+            df["DEPARTAMENTO"] = df["DEPARTAMENTO_ACCIDENTE"]
+        else:
+            df["DEPARTAMENTO"] = pd.NA
     # descartar filas sin fecha y sin departamento (si tenemos fecha detectada)
     if date_col:
         df = df.dropna(subset=[date_col, "DEPARTAMENTO"])

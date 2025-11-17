@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-RESULTS = Path("results")
+RESULTS = Path("Entrega3/results")
 RESULTS.mkdir(parents=True, exist_ok=True)
 
 PANDAS_TIMING = RESULTS / "pandas_timing.csv"

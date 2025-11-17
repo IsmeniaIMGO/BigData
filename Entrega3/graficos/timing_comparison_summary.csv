@@ -1,0 +1,8 @@
+metric,pandas,pyspark
+accidentes_por_hora_dia,0.01147,0.619258
+heridos_muertos_por_departamento,0.005548,0.705167
+load,0.39743,3.55916
+preprocess,0.142095,3.648204
+tendencias_mensuales,0.017722,0.842286
+top_por_tipo_vehiculo,0.002326,0.649685
+total_por_departamento,0.003396,1.123784
