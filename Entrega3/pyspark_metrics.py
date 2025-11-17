@@ -1,9 +1,16 @@
 # pyspark_metrics.py
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import year, month, hour, dayofweek, col, count, sum as _sum
+from pyspark.sql.functions import year, month, hour, dayofweek, col, count, sum as _sum, lit
+from pyspark import StorageLevel
 import time
+from pathlib import Path
 
-DATA_PATH = "data/accidentalidad.csv"
+DATA_PATH = "Entrega3/data/accidentalidad.csv"
+PARQUET_PATH = "Entrega3/data/accidentalidad.parquet"
+RESULTS_DIR = Path("results")
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+_TIMINGS: list[tuple[str, float]] = []
 
 def timeit(name):
     def decorator(f):
@@ -19,7 +26,9 @@ def timeit(name):
                 except Exception:
                     pass
             t1 = time.perf_counter()
-            print(f"{name} -> {t1-t0:.3f} s")
+            dt = t1 - t0
+            _TIMINGS.append((name, dt))
+            print(f"{name} -> {dt:.3f} s")
             return res
         return wrapper
     return decorator
@@ -50,25 +59,48 @@ def _write_outputs(df, base_name: str):
 
 @timeit("load")
 def load(spark):
-    df = spark.read.option("header", True).option("inferSchema", True).csv(DATA_PATH)
+    # Si existe Parquet previo, úsalo. Si no, convierte CSV → Parquet para reducir I/O en siguientes corridas
+    data_file = Path(PARQUET_PATH)
+    if data_file.exists():
+        df = spark.read.parquet(PARQUET_PATH)
+    else:
+        df = spark.read.option("header", True).option("inferSchema", True).csv(DATA_PATH)
+        # Guardar Parquet para próximas ejecuciones
+        df.write.mode("overwrite").parquet(PARQUET_PATH)
     return df
 
 @timeit("preprocess")
 def preprocess(df):
     # Aseguramos tipos y columnas temporales
-    df = df.withColumn("FECHA", col("FECHA").cast("timestamp"))
-    df = df.withColumn("ANIO", year(col("FECHA"))) \
-           .withColumn("MES", month(col("FECHA"))) \
-           .withColumn("HORA", hour(col("FECHA"))) \
-           .withColumn("DIA_SEMANA", dayofweek(col("FECHA")))
+    # detectar columna fecha flexible
+    date_candidates = ["FECHA", "fecha", "Fecha", "FECHA_HORA", "FECHA_OCURRENCIA"]
+    date_col = None
+    for c in date_candidates:
+        if c in df.columns:
+            date_col = c
+            break
+    if date_col:
+        df = df.withColumn(date_col, col(date_col).cast("timestamp"))
+        df = df.withColumn("ANIO", year(col(date_col))) \
+               .withColumn("MES", month(col(date_col))) \
+               .withColumn("HORA", hour(col(date_col))) \
+               .withColumn("DIA_SEMANA", dayofweek(col(date_col)))
+    else:
+        # columnas nulas para no romper flujos
+        df = df.withColumn("ANIO", lit(None).cast("int")) \
+               .withColumn("MES", lit(None).cast("int")) \
+               .withColumn("HORA", lit(None).cast("int")) \
+               .withColumn("DIA_SEMANA", lit(None).cast("int"))
     # Opcional: cache si se reutiliza mucho
-    df = df.filter(col("DEPARTAMENTO").isNotNull())
+    if "DEPARTAMENTO" in df.columns:
+        df = df.filter(col("DEPARTAMENTO").isNotNull())
     try:
         num_parts = int(df.sparkSession.conf.get("spark.sql.shuffle.partitions"))
     except Exception:
         num_parts = df.rdd.getNumPartitions()
-    df = df.repartition(num_parts, "DEPARTAMENTO")
-    df.cache()
+    part_col = "DEPARTAMENTO" if "DEPARTAMENTO" in df.columns else None
+    df = df.repartition(num_parts, part_col) if part_col else df.repartition(num_parts)
+    df = df.persist(StorageLevel.MEMORY_AND_DISK)
     df.count()  # materializar cache
     return df
 
@@ -115,6 +147,13 @@ def main():
     top_tipo_vehiculo(df)
     tendencias_mensuales(df)
     accidentes_por_hora_dia(df)
+    # guardar tiempos
+    import csv
+    with open(RESULTS_DIR / "pyspark_timing.csv", "w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["tool", "metric", "time_s"])
+        for metric, secs in _TIMINGS:
+            w.writerow(["pyspark", metric, f"{secs:.6f}"])
     spark.stop()
 
 if __name__ == "__main__":
