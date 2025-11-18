@@ -1,8 +1,8 @@
 tool,metric,time_s
-pandas,load,0.397430
-pandas,preprocess,0.142095
-pandas,total_por_departamento,0.003396
-pandas,heridos_muertos_por_departamento,0.005548
-pandas,top_por_tipo_vehiculo,0.002326
-pandas,tendencias_mensuales,0.017722
-pandas,accidentes_por_hora_dia,0.011470
+pandas,load,0.897126
+pandas,preprocess,10.028590
+pandas,total_por_departamento,0.008261
+pandas,heridos_muertos_por_departamento,4.512131
+pandas,top_por_tipo_vehiculo,0.004175
+pandas,tendencias_mensuales,0.032858
+pandas,accidentes_por_dia,0.014256

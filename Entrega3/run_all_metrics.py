@@ -40,7 +40,7 @@ def main():
     print(f"Tiempos combinados en: {out_csv}")
     print("[4/4] Generando diagramas...")
     run_plots()
-    print("Listo. Revisa la carpeta 'results/'.")
+    print("Listo. Revisa la carpeta 'Entrega3/results/'.")
 
 
 if __name__ == "__main__":

@@ -1,20 +1,10 @@
-# pyspark_metrics.py
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
-    year,
-    month,
-    hour,
-    dayofweek,
-    col,
-    count,
-    sum as _sum,
-    lit,
-    to_timestamp,
-    to_date,
-    coalesce as _coalesce,
-    concat,
-    lit as _lit,
-    trim,
+    year,month,hour,dayofweek,col,count,
+    sum as _sum,lit,
+    to_timestamp,to_date,
+    coalesce as _coalesce,concat,
+    lit as _lit,trim,lower,when,
 )
 from pyspark import StorageLevel
 import os
@@ -83,16 +73,25 @@ def _write_outputs(df, base_name: str):
     """Escribe resultados. En Windows sin winutils, hace fallback a pandas CSV de un solo archivo."""
     csv_dir = RESULTS_DIR / f"{base_name}_csv"
     parquet_dir = RESULTS_DIR / f"{base_name}_parquet"
+    flat_csv = RESULTS_DIR / f"{base_name}.csv"
+
+    # Helper: escribir un CSV plano sin depender de pandas/pyarrow
+    def _write_single_csv(_df, _path: Path):
+        import csv as _csv
+        cols = _df.columns
+        with open(_path, "w", encoding="utf-8", newline="") as f:
+            w = _csv.writer(f)
+            w.writerow(cols)
+            for r in _df.toLocalIterator():
+                w.writerow([r[c] for c in cols])
 
     if os.name == "nt" and not _has_winutils():
-        # Fallback: escribir un solo CSV con pandas (resultados agregados son pequeños)
+        # Fallback: escribir un solo CSV sin pandas (evita error de 'distutils' en Py3.12)
         try:
-            pdf = df.coalesce(1).toPandas()
-            out_file = RESULTS_DIR / f"{base_name}.csv"
-            pdf.to_csv(out_file, index=False, encoding="utf-8")
-            print(f"[INFO] (fallback) CSV escrito: {out_file}")
+            _write_single_csv(df.coalesce(1), flat_csv)
+            print(f"[INFO] (fallback) CSV escrito: {flat_csv}")
         except Exception as e:
-            print(f"[ERROR] Falló el fallback pandas CSV para {base_name}: {e}")
+            print(f"[ERROR] Falló el fallback CSV para {base_name}: {e}")
         print(f"[WARN] Parquet omitido para {base_name}: HADOOP_HOME/winutils no detectado en Windows.")
         return
 
@@ -102,6 +101,12 @@ def _write_outputs(df, base_name: str):
         df.write.mode("overwrite").parquet(str(parquet_dir))
     else:
         print(f"[WARN] Parquet omitido para {base_name}: HADOOP_HOME/winutils no detectado en Windows.")
+    # Además, generar un CSV plano único para facilitar la consulta
+    try:
+        _write_single_csv(df.coalesce(1), flat_csv)
+        print(f"[INFO] CSV plano escrito: {flat_csv}")
+    except Exception as e:
+        print(f"[WARN] No se pudo escribir CSV plano {flat_csv}: {e}")
 
 @timeit("load")
 def load(spark):
@@ -182,14 +187,41 @@ def total_por_departamento(df):
 
 @timeit("heridos_muertos_por_departamento")
 def heridos_muertos_por_departamento(df):
-    # Asegurarse que HERIDOS y MUERTOS existan y sean ints
+    # Usar columnas numéricas si existen y suman > 0; si no, derivar desde texto "CON HERIDOS"/"CON MUERTOS"
     df2 = df
-    if "HERIDOS" not in df2.columns:
-        df2 = df2.withColumn("HERIDOS", lit(0))
-    if "MUERTOS" not in df2.columns:
-        df2 = df2.withColumn("MUERTOS", lit(0))
-    df2 = df2.withColumn("HERIDOS", col("HERIDOS").cast("int")).withColumn("MUERTOS", col("MUERTOS").cast("int"))
-    res = df2.groupBy("DEPARTAMENTO").agg(_sum("HERIDOS").alias("HERIDOS"), _sum("MUERTOS").alias("MUERTOS")).orderBy(col("MUERTOS").desc())
+    use_numeric = False
+    if "HERIDOS" in df2.columns and "MUERTOS" in df2.columns:
+        num_df = df2.select(
+            col("HERIDOS").cast("int").alias("HERIDOS"),
+            col("MUERTOS").cast("int").alias("MUERTOS")
+        )
+        sums = num_df.agg(_sum("HERIDOS").alias("sH"), _sum("MUERTOS").alias("sM")).collect()[0]
+        if (sums["sH"] or 0) + (sums["sM"] or 0) > 0:
+            use_numeric = True
+            df2 = df2.withColumn("HERIDOS", col("HERIDOS").cast("int")).withColumn("MUERTOS", col("MUERTOS").cast("int"))
+
+    if not use_numeric:
+        # Buscar patrones en columnas string
+        str_cols = [name for (name, dtype) in df2.dtypes if dtype == "string"]
+        if str_cols:
+            expr_her = None
+            expr_mue = None
+            for c in str_cols:
+                lc = lower(trim(col(c)))
+                cond_h = lc.contains("con heridos")
+                cond_m = lc.contains("con muertos")
+                expr_her = cond_h if expr_her is None else (expr_her | cond_h)
+                expr_mue = cond_m if expr_mue is None else (expr_mue | cond_m)
+            df2 = df2.withColumn("__HERIDOS_BIN__", when(expr_her, lit(1)).otherwise(lit(0))) \
+                     .withColumn("__MUERTOS_BIN__", when(expr_mue, lit(1)).otherwise(lit(0)))
+            res = df2.groupBy("DEPARTAMENTO").agg(
+                _sum("__HERIDOS_BIN__").alias("HERIDOS"),
+                _sum("__MUERTOS_BIN__").alias("MUERTOS")
+            ).orderBy(col("MUERTOS").desc())
+        else:
+            res = df2.groupBy("DEPARTAMENTO").agg(lit(0).alias("HERIDOS"), lit(0).alias("MUERTOS"))
+    else:
+        res = df2.groupBy("DEPARTAMENTO").agg(_sum("HERIDOS").alias("HERIDOS"), _sum("MUERTOS").alias("MUERTOS")).orderBy(col("MUERTOS").desc())
     _write_outputs(res, "spark_heridos_muertos_por_departamento")
     return res
 
@@ -212,13 +244,11 @@ def tendencias_mensuales(df):
     _write_outputs(res, "spark_tendencia_mensual")
     return res
 
-@timeit("accidentes_por_hora_dia")
-def accidentes_por_hora_dia(df):
-    hour = df.filter(col("HORA").isNotNull()).groupBy("HORA").agg(count("*").alias("count")).orderBy("HORA")
+@timeit("accidentes_por_dia")
+def accidentes_por_dia(df):
     day = df.filter(col("DIA_SEMANA").isNotNull()).groupBy("DIA_SEMANA").agg(count("*").alias("count")).orderBy("DIA_SEMANA")
-    _write_outputs(hour, "spark_accidentes_por_hora")
     _write_outputs(day, "spark_accidentes_por_dia")
-    return hour, day
+    return day
 
 def main():
     spark = create_spark()
@@ -228,7 +258,7 @@ def main():
     heridos_muertos_por_departamento(df)
     top_tipo_vehiculo(df)
     tendencias_mensuales(df)
-    accidentes_por_hora_dia(df)
+    accidentes_por_dia(df)
     # guardar tiempos
     import csv
     with open(RESULTS_DIR / "pyspark_timing.csv", "w", encoding="utf-8", newline="") as f:

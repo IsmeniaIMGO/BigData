@@ -21,7 +21,7 @@ width = 0.4
 
 plt.figure(figsize=(12, 6))
 plt.bar([i - width/2 for i in x], pv["pandas"], width=width, color="#1f77b4", label="pandas")
-plt.bar([i + width/2 for i in x], pv["pyspark"], width=width, color="#ff7f0e", label="pyspark")
+plt.bar([i + width/2 for i in x], pv["pyspark"], width=width, color="#ff0000", label="pyspark")
 
 plt.xlabel("Métrica")
 plt.ylabel("Tiempo (segundos)")
